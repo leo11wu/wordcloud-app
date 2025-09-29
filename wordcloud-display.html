@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时词云展示 - 教师端</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .header {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            max-width: 1400px;
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .qr-section {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            min-width: 300px;
+        }
+        
+        .qr-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .url-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            word-break: break-all;
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 10px;
+        }
+        
+        .stats-item {
+            font-size: 1.1em;
+            margin: 5px 0;
+            color: #2e7d32;
+        }
+        
+        .wordcloud-section {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            flex: 1;
+            min-width: 600px;
+            min-height: 500px;
+        }
+        
+        .wordcloud-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        #wordcloud {
+            width: 100%;
+            height: 450px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            margin: 5px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        
+        .btn-danger {
+            background: #ef5350;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #e53935;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239,83,80,0.4);
+        }
+        
+        .empty-state {
+            color: #999;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 50px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .wordcloud-section {
+                min-width: 100%;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 实时词云互动</h1>
+        <p>学生扫码参与，实时查看结果</p>
+    </div>
+    
+    <div class="container">
+        <div class="qr-section">
+            <h2>🔗 学生入口</h2>
+            <div id="qrcode"></div>
+            <div class="url-display" id="urlDisplay"></div>
+            <div class="stats">
+                <div class="stats-item">📝 已收到: <strong><span id="totalWords">0</span></strong> 条</div>
+                <div class="stats-item">👥 参与人数: <strong><span id="participants">0</span></strong></div>
+            </div>
+        </div>
+        
+        <div class="wordcloud-section">
+            <h2>☁️ 词云图</h2>
+            <div id="wordcloud">
+                <div class="empty-state">等待学生输入...</div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="refreshWordCloud()">🔄 刷新词云</button>
+                <button class="btn btn-danger" onclick="clearData()">🗑️ 清空数据</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 生成唯一会话ID
+        const sessionId = 'session_' + Date.now();
+        
+        // 获取当前页面URL并生成学生输入页面URL
+        const studentUrl = window.location.origin + window.location.pathname.replace('wordcloud-display.html', 'wordcloud-input.html') + '?session=' + sessionId;
+        
+        // 显示URL
+        document.getElementById('urlDisplay').textContent = studentUrl;
+        
+        // 生成二维码
+        new QRCode(document.getElementById("qrcode"), {
+            text: studentUrl,
+            width: 200,
+            height: 200,
+            colorDark: "#667eea",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        
+        // 存储词语数据
+        let wordsData = [];
+        let participantIds = new Set();
+        
+        // 使用 localStorage 作为简单的数据存储
+        const STORAGE_KEY = 'wordcloud_' + sessionId;
+        
+        // 加载已有数据
+        function loadData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const data = JSON.parse(stored);
+                wordsData = data.words || [];
+                participantIds = new Set(data.participants || []);
+                updateStats();
+                generateWordCloud();
+            }
+        }
+        
+        // 保存数据
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                words: wordsData,
+                participants: Array.from(participantIds)
+            }));
+        }
+        
+        // 定期检查新数据
+        setInterval(() => {
+            loadData();
+        }, 2000);
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('totalWords').textContent = wordsData.length;
+            document.getElementById('participants').textContent = participantIds.size;
+        }
+        
+        // 生成词云
+        function generateWordCloud() {
+            if (wordsData.length === 0) {
+                document.getElementById('wordcloud').innerHTML = '<div class="empty-state">等待学生输入...</div>';
+                return;
+            }
+            
+            // 统计词频
+            const wordFreq = {};
+            wordsData.forEach(word => {
+                const normalizedWord = word.trim();
+                if (normalizedWord) {
+                    wordFreq[normalizedWord] = (wordFreq[normalizedWord] || 0) + 1;
+                }
+            });
+            
+            // 转换为词云数据格式
+            const cloudData = Object.keys(wordFreq).map(word => ({
+                text: word,
+                size: wordFreq[word]
+            }));
+            
+            // 清空容器
+            document.getElementById('wordcloud').innerHTML = '';
+            
+            // 创建词云
+            const width = document.getElementById('wordcloud').clientWidth;
+            const height = 450;
+            
+            const layout = d3.layout.cloud()
+                .size([width, height])
+                .words(cloudData)
+                .padding(5)
+                .rotate(() => ~~(Math.random() * 2) * 90)
+                .font("Microsoft YaHei")
+                .fontSize(d => Math.sqrt(d.size) * 20 + 10)
+                .on("end", draw);
+            
+            layout.start();
+            
+            function draw(words) {
+                const svg = d3.select("#wordcloud").append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .append("g")
+                    .attr("transform", `translate(${width/2},${height/2})`);
+                
+                const color = d3.scaleOrdinal(d3.schemeCategory10);
+                
+                svg.selectAll("text")
+                    .data(words)
+                    .enter().append("text")
+                    .style("font-size", d => d.size + "px")
+                    .style("font-family", "Microsoft YaHei")
+                    .style("fill", (d, i) => color(i))
+                    .attr("text-anchor", "middle")
+                    .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
+                    .text(d => d.text)
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(1000)
+                    .style("opacity", 1);
+            }
+        }
+        
+        // 刷新词云
+        function refreshWordCloud() {
+            loadData();
+            generateWordCloud();
+        }
+        
+        // 清空数据
+        function clearData() {
+            if (confirm('确定要清空所有数据吗？')) {
+                wordsData = [];
+                participantIds.clear();
+                saveData();
+                updateStats();
+                generateWordCloud();
+            }
+        }
+        
+        // 初始加载
+        loadData();
+        
+        // 监听来自学生页面的消息
+        window.addEventListener('storage', (e) => {
+            if (e.key === STORAGE_KEY) {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>

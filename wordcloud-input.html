@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输入你的想法 - 学生端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .emoji {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .char-count {
+            text-align: right;
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+        
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+        
+        .submitted-words {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .submitted-words h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .word-tag {
+            display: inline-block;
+            background: #f0f4ff;
+            color: #667eea;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+        
+        .help-text {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="emoji">💭</div>
+            <h1>分享你的想法</h1>
+            <p>你的输入会实时显示在大屏幕上</p>
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <form id="wordForm">
+            <div class="form-group">
+                <label for="nickname">昵称（可选）</label>
+                <input type="text" id="nickname" placeholder="输入你的昵称...">
+            </div>
+            
+            <div class="form-group">
+                <label for="words">你的想法 *</label>
+                <textarea id="words" placeholder="输入一个或多个词语，用空格或逗号分隔..." required></textarea>
+                <div class="char-count"><span id="charCount">0</span> / 200</div>
+                <div class="help-text">💡 可以输入多个词语，用空格或逗号分开</div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">
+                ✨ 提交
+            </button>
+        </form>
+        
+        <div class="submitted-words" id="submittedSection" style="display: none;">
+            <h3>✅ 你已提交的词语</h3>
+            <div id="submittedList"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取会话ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        
+        if (!sessionId) {
+            document.getElementById('message').textContent = '❌ 无效的访问链接';
+            document.getElementById('message').className = 'message error';
+            document.getElementById('wordForm').style.display = 'none';
+        }
+        
+        const STORAGE_KEY = 'wordcloud_' + sessionId;
+        
+        // 生成用户ID
+        let userId = localStorage.getItem('userId_' + sessionId);
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('userId_' + sessionId, userId);
+        }
+        
+        // 加载用户已提交的词语
+        let userWords = JSON.parse(localStorage.getItem('userWords_' + sessionId) || '[]');
+        
+        // 显示已提交的词语
+        function displaySubmittedWords() {
+            if (userWords.length > 0) {
+                document.getElementById('submittedSection').style.display = 'block';
+                document.getElementById('submittedList').innerHTML = userWords
+                    .map(word => `<span class="word-tag">${word}</span>`)
+                    .join('');
+            }
+        }
+        
+        displaySubmittedWords();
+        
+        // 字数统计
+        const wordsInput = document.getElementById('words');
+        const charCount = document.getElementById('charCount');
+        
+        wordsInput.addEventListener('input', () => {
+            const length = wordsInput.value.length;
+            charCount.textContent = length;
+            
+            if (length > 200) {
+                charCount.style.color = '#c62828';
+                wordsInput.value = wordsInput.value.substring(0, 200);
+                charCount.textContent = 200;
+            } else {
+                charCount.style.color = '#999';
+            }
+        });
+        
+        // 表单提交
+        document.getElementById('wordForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const nickname = document.getElementById('nickname').value.trim();
+            const wordsText = wordsInput.value.trim();
+            
+            if (!wordsText) {
+                showMessage('请输入至少一个词语', 'error');
+                return;
+            }
+            
+            // 分割词语（支持空格、逗号、顿号等分隔符）
+            const newWords = wordsText
+                .split(/[\s,，、；;]+/)
+                .filter(word => word.length > 0)
+                .map(word => word.trim());
+            
+            if (newWords.length === 0) {
+                showMessage('请输入有效的词语', 'error');
+                return;
+            }
+            
+            // 禁用提交按钮
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+            
+            try {
+                // 获取当前数据
+                const stored = localStorage.getItem(STORAGE_KEY);
+                const data = stored ? JSON.parse(stored) : { words: [], participants: [] };
+                
+                // 添加新词语
+                data.words.push(...newWords);
+                
+                // 添加参与者
+                if (!data.participants.includes(userId)) {
+                    data.participants.push(userId);
+                }
+                
+                // 保存数据
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                
+                // 保存用户的词语
+                userWords.push(...newWords);
+                localStorage.setItem('userWords_' + sessionId, JSON.stringify(userWords));
+                
+                // 显示成功消息
+                showMessage(`✅ 成功提交 ${newWords.length} 个词语！`, 'success');
+                
+                // 清空表单
+                wordsInput.value = '';
+                charCount.textContent = '0';
+                
+                // 显示已提交的词语
+                displaySubmittedWords();
+                
+                // 重新启用按钮
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✨ 再次提交';
+                }, 1000);
+                
+            } catch (error) {
+                showMessage('❌ 提交失败，请重试', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✨ 提交';
+            }
+        });
+        
+        // 显示消息
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = 'message ' + type;
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
