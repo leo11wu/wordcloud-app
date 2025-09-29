@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时词云展示 - 教师端</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .header {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            max-width: 1400px;
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .qr-section {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            min-width: 300px;
+        }
+        
+        .qr-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .url-display {
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            word-break: break-all;
+            font-size: 0.85em;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .copy-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 10px;
+        }
+        
+        .stats-item {
+            font-size: 1.1em;
+            margin: 5px 0;
+            color: #2e7d32;
+        }
+        
+        .wordcloud-section {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            flex: 1;
+            min-width: 600px;
+            min-height: 500px;
+        }
+        
+        .wordcloud-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        #wordcloud {
+            width: 100%;
+            height: 450px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            margin: 5px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+        }
+        
+        .btn-danger {
+            background: #ef5350;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #e53935;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239,83,80,0.4);
+        }
+        
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76,175,80,0.4);
+        }
+        
+        .empty-state {
+            color: #999;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4caf50;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .word-list {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .word-item {
+            display: inline-block;
+            background: white;
+            padding: 5px 12px;
+            margin: 5px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .wordcloud-section {
+                min-width: 100%;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 实时词云互动</h1>
+        <p>学生扫码参与，实时查看结果</p>
+    </div>
+    
+    <div class="container">
+        <div class="qr-section">
+            <h2>🔗 学生入口</h2>
+            <div id="qrcode"></div>
+            <div class="url-display" id="urlDisplay"></div>
+            <button class="copy-btn" onclick="copyUrl()">📋 复制链接</button>
+            <div class="stats">
+                <div class="stats-item">
+                    <span class="status-indicator"></span>
+                    实时连接
+                </div>
+                <div class="stats-item">📝 已收到: <strong><span id="totalWords">0</span></strong> 条</div>
+                <div class="stats-item">👥 参与人数: <strong><span id="participants">0</span></strong></div>
+            </div>
+        </div>
+        
+        <div class="wordcloud-section">
+            <h2>☁️ 词云图</h2>
+            <div id="wordcloud">
+                <div class="empty-state">等待学生输入...</div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="refreshWordCloud()">🔄 刷新词云</button>
+                <button class="btn btn-success" onclick="downloadWordCloud()">💾 保存图片</button>
+                <button class="btn btn-danger" onclick="clearData()">🗑️ 清空数据</button>
+            </div>
+            <div class="word-list" id="wordList" style="display: none;">
+                <strong>最近提交的词语：</strong>
+                <div id="recentWords"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 生成唯一会话ID
+        let sessionId = new URLSearchParams(window.location.search).get('session');
+        if (!sessionId) {
+            sessionId = 'session_' + Date.now();
+            // 更新URL但不刷新页面
+            const newUrl = window.location.pathname + '?session=' + sessionId;
+            window.history.replaceState({}, '', newUrl);
+        }
+        
+        // 获取学生输入页面URL
+        const studentUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'student.html?session=' + sessionId;
+        
+        // 显示URL
+        document.getElementById('urlDisplay').textContent = studentUrl;
+        
+        // 生成二维码
+        new QRCode(document.getElementById("qrcode"), {
+            text: studentUrl,
+            width: 200,
+            height: 200,
+            colorDark: "#667eea",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        
+        // 复制URL功能
+        function copyUrl() {
+            navigator.clipboard.writeText(studentUrl).then(() => {
+                showToast('✅ 链接已复制到剪贴板');
+            }).catch(() => {
+                // 备用方案
+                const textarea = document.createElement('textarea');
+                textarea.value = studentUrl;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('✅ 链接已复制到剪贴板');
+            });
+        }
+        
+        // 显示提示消息
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 数据存储
+        let wordsData = [];
+        let participantIds = new Set();
+        let wordFrequency = {};
+        
+        const STORAGE_KEY = 'wordcloud_' + sessionId;
+        const CHANNEL_NAME = 'wordcloud_channel_' + sessionId;
+        
+        // 使用BroadcastChannel进行跨标签页通信
+        let broadcastChannel;
+        try {
+            broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
+            broadcastChannel.onmessage = (event) => {
+                if (event.data.type === 'new_words') {
+                    loadData();
+                    showToast('🎉 收到新的词语！');
+                }
+            };
+        } catch (e) {
+            console.log('BroadcastChannel not supported, using storage events');
+        }
+        
+        // 加载数据
+        function loadData() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    wordsData = data.words || [];
+                    participantIds = new Set(data.participants || []);
+                    
+                    // 计算词频
+                    wordFrequency = {};
+                    wordsData.forEach(word => {
+                        const normalizedWord = word.trim();
+                        if (normalizedWord) {
+                            wordFrequency[normalizedWord] = (wordFrequency[normalizedWord] || 0) + 1;
+                        }
+                    });
+                    
+                    updateStats();
+                    generateWordCloud();
+                    updateRecentWords();
+                }
+            } catch (e) {
+                console.error('Error loading data:', e);
+            }
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('totalWords').textContent = wordsData.length;
+            document.getElementById('participants').textContent = participantIds.size;
+        }
+        
+        // 更新最近的词语列表
+        function updateRecentWords() {
+            if (wordsData.length > 0) {
+                const recentWordsDiv = document.getElementById('recentWords');
+                const wordListDiv = document.getElementById('wordList');
+                
+                // 显示最近10个词语
+                const recentWords = wordsData.slice(-10).reverse();
+                recentWordsDiv.innerHTML = recentWords
+                    .map(word => `<span class="word-item">${word}</span>`)
+                    .join('');
+                
+                wordListDiv.style.display = 'block';
+            }
+        }
+        
+        // 生成词云
+        function generateWordCloud() {
+            if (wordsData.length === 0) {
+                document.getElementById('wordcloud').innerHTML = '<div class="empty-state">等待学生输入...</div>';
+                return;
+            }
+            
+            // 转换为词云数据格式
+            const cloudData = Object.keys(wordFrequency).map(word => ({
+                text: word,
+                size: wordFrequency[word]
+            }));
+            
+            // 清空容器
+            document.getElementById('wordcloud').innerHTML = '';
+            
+            // 创建词云
+            const width = document.getElementById('wordcloud').clientWidth;
+            const height = 450;
+            
+            // 计算字体大小范围
+            const maxFreq = Math.max(...Object.values(wordFrequency));
+            const minFreq = Math.min(...Object.values(wordFrequency));
+            const fontScale = d3.scaleLinear()
+                .domain([minFreq, maxFreq])
+                .range([16, 80]);
+            
+            const layout = d3.layout.cloud()
+                .size([width, height])
+                .words(cloudData)
+                .padding(8)
+                .rotate(() => (Math.random() > 0.7 ? 90 : 0))
+                .font("Microsoft YaHei, PingFang SC, Arial")
+                .fontSize(d => fontScale(d.size))
+                .on("end", draw);
+            
+            layout.start();
+            
+            function draw(words) {
+                const svg = d3.select("#wordcloud").append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .attr("id", "wordcloudSvg")
+                    .append("g")
+                    .attr("transform", `translate(${width/2},${height/2})`);
+                
+                const color = d3.scaleOrdinal()
+                    .range(['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0']);
+                
+                svg.selectAll("text")
+                    .data(words)
+                    .enter().append("text")
+                    .style("font-size", d => d.size + "px")
+                    .style("font-family", "Microsoft YaHei, PingFang SC, Arial")
+                    .style("font-weight", d => d.size > fontScale((maxFreq + minFreq) / 2) ? "bold" : "normal")
+                    .style("fill", (d, i) => color(i))
+                    .attr("text-anchor", "middle")
+                    .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
+                    .text(d => d.text)
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(1000)
+                    .style("opacity", 1)
+                    .ease(d3.easeCubicOut);
+            }
+        }
+        
+        // 下载词云图片
+        function downloadWordCloud() {
+            const svg = document.getElementById('wordcloudSvg');
+            if (!svg) {
+                showToast('⚠️ 请先生成词云');
+                return;
+            }
+            
+            // 创建canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const img = new Image();
+            
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                // 下载
+                const link = document.createElement('a');
+                link.download = `词云图_${new Date().toLocaleDateString()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                showToast('✅ 词云图已保存');
+            };
+            
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }
+        
+        // 刷新词云
+        function refreshWordCloud() {
+            loadData();
+            showToast('🔄 已刷新');
+        }
+        
+        // 清空数据
+        function clearData() {
+            if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                wordsData = [];
+                participantIds.clear();
+                wordFrequency = {};
+                localStorage.removeItem(STORAGE_KEY);
+                updateStats();
+                generateWordCloud();
+                document.getElementById('wordList').style.display = 'none';
+                showToast('🗑️ 数据已清空');
+            }
+        }
+        
+        // 定期检查新数据
+        setInterval(() => {
+            loadData();
+        }, 3000);
+        
+        // 监听storage事件（跨标签页）
+        window.addEventListener('storage', (e) => {
+            if (e.key === STORAGE_KEY) {
+                loadData();
+            }
+        });
+        
+        // 初始加载
+        loadData();
+        
+        // 页面可见性变化时重新加载
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>
