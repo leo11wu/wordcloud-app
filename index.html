@@ -41,6 +41,62 @@
             opacity: 0.9;
         }
         
+        .setup-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .setup-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+        }
+        
+        .setup-content h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .setup-content p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        .setup-content input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        
+        .setup-content button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .setup-content button:hover {
+            background: #5568d3;
+        }
+        
         .container {
             display: flex;
             gap: 30px;
@@ -93,6 +149,7 @@
             cursor: pointer;
             font-size: 0.9em;
             transition: all 0.3s;
+            margin: 5px;
         }
         
         .copy-btn:hover {
@@ -253,13 +310,18 @@
             }
         }
         
-        .debug-info {
+        .info-box {
             margin-top: 15px;
-            padding: 10px;
+            padding: 15px;
             background: #fff3cd;
             border-radius: 8px;
-            font-size: 0.85em;
+            font-size: 0.9em;
             color: #856404;
+        }
+        
+        .info-box strong {
+            display: block;
+            margin-bottom: 8px;
         }
         
         @media (max-width: 768px) {
@@ -278,9 +340,24 @@
     </style>
 </head>
 <body>
+    <div id="setupModal" class="setup-modal">
+        <div class="setup-content">
+            <h2>⚙️ 初始设置</h2>
+            <p>由于纯前端无法跨设备同步数据，我们使用 <strong>共享链接</strong> 方式：</p>
+            <ol style="margin-bottom: 20px; line-height: 1.8;">
+                <li>创建一个 <strong>房间码</strong>（例如：room123）</li>
+                <li>所有设备使用同一个房间码</li>
+                <li>数据存储在浏览器本地</li>
+                <li><strong>教师需要手动点击刷新按钮</strong>查看新数据</li>
+            </ol>
+            <input type="text" id="roomCode" placeholder="输入房间码，例如：room123" />
+            <button onclick="startSession()">🚀 开始活动</button>
+        </div>
+    </div>
+
     <div class="header">
         <h1>📊 实时词云互动</h1>
-        <p>学生扫码参与，实时查看结果</p>
+        <p>学生扫码参与，教师手动刷新查看结果</p>
     </div>
     
     <div class="container">
@@ -289,30 +366,31 @@
             <div id="qrcode"></div>
             <div class="url-display" id="urlDisplay"></div>
             <button class="copy-btn" onclick="copyUrl()">📋 复制链接</button>
+            <button class="copy-btn" onclick="showRoomInfo()">🏠 房间信息</button>
             <div class="stats">
                 <div class="stats-item">
                     <span class="status-indicator"></span>
-                    自动刷新中
+                    房间: <strong><span id="roomDisplay">-</span></strong>
                 </div>
                 <div class="stats-item">📝 已收到: <strong><span id="totalWords">0</span></strong> 条</div>
                 <div class="stats-item">👥 参与人数: <strong><span id="participants">0</span></strong></div>
-                <div class="stats-item">🔄 上次刷新: <span id="lastRefresh">-</span></div>
+                <div class="stats-item">🔄 上次刷新: <span id="lastRefresh">从未</span></div>
             </div>
-            <div class="debug-info">
-                <strong>提示：</strong><br>
-                • 教师端每秒自动检查新数据<br>
-                • 学生提交后1-2秒内会更新<br>
-                • 如未更新，请点击"手动刷新"
+            <div class="info-box">
+                <strong>⚠️ 重要提示：</strong>
+                • 学生提交后，需要<strong>手动点击"刷新数据"按钮</strong><br>
+                • 建议每隔30秒刷新一次<br>
+                • 或让学生提交后举手示意
             </div>
         </div>
         
         <div class="wordcloud-section">
             <h2>☁️ 词云图</h2>
             <div id="wordcloud">
-                <div class="empty-state">等待学生输入...<br><small style="font-size: 0.8em; color: #ccc;">系统正在自动监听新数据</small></div>
+                <div class="empty-state">等待数据...<br><small style="font-size: 0.8em; color: #ccc;">点击下方"刷新数据"按钮获取最新内容</small></div>
             </div>
             <div class="controls">
-                <button class="btn btn-primary" onclick="manualRefresh()">🔄 手动刷新</button>
+                <button class="btn btn-primary" onclick="manualRefresh()">🔄 刷新数据</button>
                 <button class="btn btn-success" onclick="downloadWordCloud()">💾 保存图片</button>
                 <button class="btn btn-danger" onclick="clearData()">🗑️ 清空数据</button>
             </div>
@@ -326,34 +404,52 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // 生成唯一会话ID
-        let sessionId = new URLSearchParams(window.location.search).get('session');
-        if (!sessionId) {
-            sessionId = 'session_' + Date.now();
-            const newUrl = window.location.pathname + '?session=' + sessionId;
-            window.history.replaceState({}, '', newUrl);
+        let sessionId = '';
+        let studentUrl = '';
+        
+        // 数据存储
+        let wordsData = [];
+        let participantIds = new Set();
+        let wordFrequency = {};
+        
+        function startSession() {
+            const roomCode = document.getElementById('roomCode').value.trim();
+            if (!roomCode) {
+                alert('请输入房间码！');
+                return;
+            }
+            
+            sessionId = 'wordcloud_' + roomCode;
+            studentUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'student.html?room=' + roomCode;
+            
+            // 隐藏设置窗口
+            document.getElementById('setupModal').style.display = 'none';
+            
+            // 显示房间信息
+            document.getElementById('roomDisplay').textContent = roomCode;
+            document.getElementById('urlDisplay').textContent = studentUrl;
+            
+            // 生成二维码
+            new QRCode(document.getElementById("qrcode"), {
+                text: studentUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#667eea",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // 加载数据
+            loadData();
         }
         
-        // 获取学生输入页面URL
-        const studentUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'student.html?session=' + sessionId;
+        function showRoomInfo() {
+            alert(`房间信息：\n房间码：${sessionId.replace('wordcloud_', '')}\n学生链接：${studentUrl}`);
+        }
         
-        // 显示URL
-        document.getElementById('urlDisplay').textContent = studentUrl;
-        
-        // 生成二维码
-        new QRCode(document.getElementById("qrcode"), {
-            text: studentUrl,
-            width: 200,
-            height: 200,
-            colorDark: "#667eea",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-        });
-        
-        // 复制URL功能
         function copyUrl() {
             navigator.clipboard.writeText(studentUrl).then(() => {
-                showToast('✅ 链接已复制到剪贴板');
+                showToast('✅ 链接已复制！');
             }).catch(() => {
                 const textarea = document.createElement('textarea');
                 textarea.value = studentUrl;
@@ -361,11 +457,10 @@
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                showToast('✅ 链接已复制到剪贴板');
+                showToast('✅ 链接已复制！');
             });
         }
         
-        // 显示提示消息
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
@@ -375,18 +470,9 @@
             }, 3000);
         }
         
-        // 数据存储
-        let wordsData = [];
-        let participantIds = new Set();
-        let wordFrequency = {};
-        let lastWordCount = 0;
-        
-        const STORAGE_KEY = 'wordcloud_' + sessionId;
-        
-        // 加载数据
         function loadData() {
             try {
-                const stored = localStorage.getItem(STORAGE_KEY);
+                const stored = localStorage.getItem(sessionId);
                 if (stored) {
                     const data = JSON.parse(stored);
                     wordsData = data.words || [];
@@ -401,35 +487,29 @@
                         }
                     });
                     
-                    // 检测新数据
-                    if (wordsData.length > lastWordCount && lastWordCount > 0) {
-                        showToast('🎉 收到 ' + (wordsData.length - lastWordCount) + ' 个新词语！');
-                    }
-                    lastWordCount = wordsData.length;
-                    
                     updateStats();
                     generateWordCloud();
                     updateRecentWords();
                     
-                    // 更新最后刷新时间
+                    // 更新刷新时间
                     const now = new Date();
                     document.getElementById('lastRefresh').textContent = 
                         now.getHours().toString().padStart(2, '0') + ':' + 
                         now.getMinutes().toString().padStart(2, '0') + ':' + 
                         now.getSeconds().toString().padStart(2, '0');
+                } else {
+                    updateStats();
                 }
             } catch (e) {
                 console.error('Error loading data:', e);
             }
         }
         
-        // 更新统计信息
         function updateStats() {
             document.getElementById('totalWords').textContent = wordsData.length;
             document.getElementById('participants').textContent = participantIds.size;
         }
         
-        // 更新最近的词语列表
         function updateRecentWords() {
             if (wordsData.length > 0) {
                 const recentWordsDiv = document.getElementById('recentWords');
@@ -444,10 +524,9 @@
             }
         }
         
-        // 生成词云
         function generateWordCloud() {
             if (wordsData.length === 0) {
-                document.getElementById('wordcloud').innerHTML = '<div class="empty-state">等待学生输入...<br><small style="font-size: 0.8em; color: #ccc;">系统正在自动监听新数据</small></div>';
+                document.getElementById('wordcloud').innerHTML = '<div class="empty-state">等待数据...<br><small style="font-size: 0.8em; color: #ccc;">点击下方"刷新数据"按钮获取最新内容</small></div>';
                 return;
             }
             
@@ -507,7 +586,6 @@
             }
         }
         
-        // 下载词云图片
         function downloadWordCloud() {
             const svg = document.getElementById('wordcloudSvg');
             if (!svg) {
@@ -539,62 +617,23 @@
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
         }
         
-        // 手动刷新
         function manualRefresh() {
             loadData();
-            showToast('🔄 已手动刷新');
+            showToast('🔄 数据已刷新！');
         }
         
-        // 清空数据
         function clearData() {
             if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
                 wordsData = [];
                 participantIds.clear();
                 wordFrequency = {};
-                lastWordCount = 0;
-                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(sessionId);
                 updateStats();
                 generateWordCloud();
                 document.getElementById('wordList').style.display = 'none';
                 showToast('🗑️ 数据已清空');
             }
         }
-        
-        // 自动刷新 - 每1秒检查一次
-        setInterval(() => {
-            loadData();
-        }, 1000);
-        
-        // 监听storage事件（跨标签页 - 同一浏览器不同标签）
-        window.addEventListener('storage', (e) => {
-            if (e.key === STORAGE_KEY) {
-                console.log('Storage event detected');
-                loadData();
-            }
-        });
-        
-        // 页面获得焦点时刷新
-        window.addEventListener('focus', () => {
-            console.log('Window focused, refreshing');
-            loadData();
-        });
-        
-        // 页面可见性变化时刷新
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                console.log('Page visible, refreshing');
-                loadData();
-            }
-        });
-        
-        // 初始加载
-        loadData();
-        
-        // 告知用户系统正在运行
-        console.log('词云系统已启动');
-        console.log('会话ID:', sessionId);
-        console.log('存储键:', STORAGE_KEY);
-        console.log('每1秒自动检查新数据');
     </script>
 </body>
 </html>

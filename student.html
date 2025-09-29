@@ -292,6 +292,36 @@
             to { transform: rotate(360deg); }
         }
         
+        .room-info {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #1565c0;
+            font-weight: bold;
+        }
+        
+        .important-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .important-notice strong {
+            color: #856404;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .important-notice p {
+            color: #856404;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
@@ -312,7 +342,17 @@
         <div class="header">
             <div class="emoji">💭</div>
             <h1>分享你的想法</h1>
-            <p>你的输入会实时显示在大屏幕上</p>
+            <p>你的输入会保存到共享数据中</p>
+        </div>
+        
+        <div class="room-info" id="roomInfo">
+            🏠 房间: <span id="roomDisplay">-</span>
+        </div>
+        
+        <div class="important-notice">
+            <strong>⚠️ 重要提示</strong>
+            <p>提交后，教师需要<strong>手动点击"刷新数据"按钮</strong>才能看到你的词语。<br>
+            提交成功后，你可以继续提交更多词语。</p>
         </div>
         
         <div id="message" class="message"></div>
@@ -354,36 +394,29 @@
     </div>
 
     <script>
-        // 获取会话ID
+        // 获取房间码
         const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
+        const roomCode = urlParams.get('room');
         
-        if (!sessionId) {
+        if (!roomCode) {
             document.getElementById('message').textContent = '❌ 无效的访问链接，请扫描正确的二维码';
             document.getElementById('message').className = 'message error';
             document.getElementById('wordForm').style.display = 'none';
+        } else {
+            document.getElementById('roomDisplay').textContent = roomCode;
         }
         
-        const STORAGE_KEY = 'wordcloud_' + sessionId;
-        const CHANNEL_NAME = 'wordcloud_channel_' + sessionId;
+        const sessionId = 'wordcloud_' + roomCode;
         
         // 生成用户ID
-        let userId = localStorage.getItem('userId_' + sessionId);
+        let userId = localStorage.getItem('userId_' + roomCode);
         if (!userId) {
             userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('userId_' + sessionId, userId);
-        }
-        
-        // 使用BroadcastChannel通知教师端
-        let broadcastChannel;
-        try {
-            broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
-        } catch (e) {
-            console.log('BroadcastChannel not supported');
+            localStorage.setItem('userId_' + roomCode, userId);
         }
         
         // 加载用户已提交的词语
-        let userWords = JSON.parse(localStorage.getItem('userWords_' + sessionId) || '[]');
+        let userWords = JSON.parse(localStorage.getItem('userWords_' + roomCode) || '[]');
         
         // 显示已提交的词语
         function displaySubmittedWords() {
@@ -441,12 +474,12 @@
                 return;
             }
             
-            // 分割词语（支持空格、逗号、顿号等分隔符）
+            // 分割词语
             const newWords = wordsText
                 .split(/[\s,，、；;\n]+/)
                 .filter(word => word.length > 0)
                 .map(word => word.trim())
-                .filter(word => word.length <= 20); // 限制单个词语长度
+                .filter(word => word.length <= 20);
             
             if (newWords.length === 0) {
                 showMessage('❌ 请输入有效的词语', 'error');
@@ -465,7 +498,7 @@
             
             try {
                 // 获取当前数据
-                const stored = localStorage.getItem(STORAGE_KEY);
+                const stored = localStorage.getItem(sessionId);
                 const data = stored ? JSON.parse(stored) : { words: [], participants: [] };
                 
                 // 添加新词语
@@ -480,24 +513,15 @@
                 data.lastUpdate = Date.now();
                 
                 // 保存数据
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                
-                // 通知教师端
-                if (broadcastChannel) {
-                    broadcastChannel.postMessage({
-                        type: 'new_words',
-                        words: newWords,
-                        userId: userId
-                    });
-                }
+                localStorage.setItem(sessionId, JSON.stringify(data));
                 
                 // 保存用户的词语
                 userWords.push(...newWords);
-                localStorage.setItem('userWords_' + sessionId, JSON.stringify(userWords));
+                localStorage.setItem('userWords_' + roomCode, JSON.stringify(userWords));
                 
                 // 显示成功消息
                 const wordCount = newWords.length;
-                showMessage(`✅ 太棒了！成功提交 ${wordCount} 个词语！`, 'success');
+                showMessage(`✅ 成功提交 ${wordCount} 个词语！教师需要手动刷新才能看到。`, 'success');
                 
                 // 清空表单
                 wordsInput.value = '';
@@ -529,12 +553,12 @@
             
             setTimeout(() => {
                 messageEl.style.display = 'none';
-            }, 4000);
+            }, 5000);
         }
         
         // 页面加载时显示欢迎消息
         window.addEventListener('load', () => {
-            if (sessionId) {
+            if (roomCode) {
                 setTimeout(() => {
                     if (userWords.length === 0) {
                         showMessage('👋 欢迎！开始分享你的想法吧', 'success');
